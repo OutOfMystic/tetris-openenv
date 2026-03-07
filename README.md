@@ -5,7 +5,7 @@ colorFrom: purple
 colorTo: blue
 sdk: docker
 app_port: 8000
-base_path: /web
+base_path: /play
 tags:
   - openenv
 ---

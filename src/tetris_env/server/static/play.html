@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tetris OpenEnv</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  .game-container {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  .board-wrap {
+    background: #16213e;
+    border: 2px solid #0f3460;
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(10, 28px);
+    grid-template-rows: repeat(20, 28px);
+    gap: 1px;
+    background: #0a0a1a;
+  }
+  .cell {
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+  }
+  .cell-empty { background: #16213e; }
+  .cell-placed { background: #e94560; border: 1px solid #ff6b81; }
+  .cell-current { background: #53d769; border: 1px solid #7bff8e; }
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 200px;
+  }
+  .panel {
+    background: #16213e;
+    border: 2px solid #0f3460;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h3 {
+    color: #e94560;
+    margin-bottom: 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+    font-size: 14px;
+  }
+  .stat-value { color: #53d769; font-weight: bold; }
+  .next-piece {
+    display: grid;
+    grid-template-columns: repeat(4, 22px);
+    gap: 1px;
+    margin-top: 8px;
+  }
+  .next-cell {
+    width: 22px;
+    height: 22px;
+    border-radius: 2px;
+    background: #0a0a1a;
+  }
+  .next-cell.filled { background: #e94560; border: 1px solid #ff6b81; }
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .controls button {
+    background: #0f3460;
+    color: #e0e0e0;
+    border: 1px solid #e94560;
+    border-radius: 6px;
+    padding: 10px 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .controls button:hover { background: #e94560; }
+  .controls button:active { background: #ff6b81; }
+  .controls button.wide { grid-column: span 3; }
+  .controls button.half { grid-column: span 1; }
+  .status {
+    font-size: 12px;
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+  }
+  .status.connected { background: #1b4332; color: #53d769; }
+  .status.disconnected { background: #4a1525; color: #e94560; }
+  .status.gameover { background: #4a1525; color: #ff6b81; font-size: 16px; font-weight: bold; }
+  .reward-display {
+    text-align: center;
+    font-size: 18px;
+    padding: 4px;
+  }
+  .reward-pos { color: #53d769; }
+  .reward-neg { color: #e94560; }
+  kbd {
+    background: #0a0a1a;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+<div class="game-container">
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="sidebar">
+    <div id="status" class="status disconnected">Connecting...</div>
+
+    <div class="panel">
+      <h3>Score</h3>
+      <div class="stat-row"><span>Score</span><span class="stat-value" id="score">0</span></div>
+      <div class="stat-row"><span>Lines</span><span class="stat-value" id="lines">0</span></div>
+      <div class="stat-row"><span>Height</span><span class="stat-value" id="height">0</span></div>
+      <div class="stat-row"><span>Holes</span><span class="stat-value" id="holes">0</span></div>
+      <div class="stat-row"><span>Steps</span><span class="stat-value" id="steps">0</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Last Reward</h3>
+      <div class="reward-display" id="reward">-</div>
+    </div>
+
+    <div class="panel">
+      <h3>Next Piece</h3>
+      <div class="next-piece" id="next-piece"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Controls</h3>
+      <div class="controls">
+        <button onclick="send('rotate_ccw')">&#x21BA; CCW<br><kbd>Q</kbd></button>
+        <button onclick="send('drop')">DROP<br><kbd>Space</kbd></button>
+        <button onclick="send('rotate_cw')">CW &#x21BB;<br><kbd>E</kbd></button>
+        <button onclick="send('left')">&#x2190; Left<br><kbd>A</kbd></button>
+        <button onclick="send('down')">&#x2193; Down<br><kbd>S</kbd></button>
+        <button onclick="send('right')">Right &#x2192;<br><kbd>D</kbd></button>
+        <button class="wide" onclick="doReset()" style="background:#4a1525">NEW GAME &nbsp;<kbd>R</kbd></button>
+      </div>
+    </div>
+
+    <div class="panel" style="font-size:11px; color:#888;">
+      <b>Keyboard:</b> A/D = move, S = down, Space = drop, Q/E = rotate, R = reset
+    </div>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const COLS = 10, ROWS = 20;
+let ws = null;
+let gameOver = false;
+
+// Build board cells
+for (let i = 0; i < ROWS * COLS; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'cell cell-empty';
+  boardEl.appendChild(cell);
+}
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = proto + '//' + location.host + '/ws';
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    setStatus('connected', 'Connected');
+    doReset();
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.data) handleObs(msg.data);
+  };
+
+  ws.onclose = () => {
+    setStatus('disconnected', 'Disconnected — reconnecting...');
+    setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function setStatus(cls, text) {
+  const el = document.getElementById('status');
+  el.className = 'status ' + cls;
+  el.textContent = text;
+}
+
+function send(action) {
+  if (!ws || ws.readyState !== 1) return;
+  if (gameOver) return;
+  ws.send(JSON.stringify({type: 'step', data: {action: action, metadata: {}}}));
+}
+
+function doReset() {
+  if (!ws || ws.readyState !== 1) return;
+  gameOver = false;
+  setStatus('connected', 'Connected');
+  ws.send(JSON.stringify({type: 'reset', data: {}}));
+}
+
+function handleObs(data) {
+  const obs = data.observation || data;
+  const reward = data.reward;
+  const done = data.done || obs.done;
+
+  // Parse board text
+  if (obs.board) {
+    const lines = obs.board.split('\n').filter(l => l.startsWith('|'));
+    const cells = boardEl.children;
+    for (let r = 0; r < ROWS; r++) {
+      const row = lines[r] || '';
+      const chars = row.slice(1, 11); // strip | |
+      for (let c = 0; c < COLS; c++) {
+        const ch = chars[c] || '.';
+        const idx = r * COLS + c;
+        if (ch === '#') cells[idx].className = 'cell cell-placed';
+        else if (ch === '@') cells[idx].className = 'cell cell-current';
+        else cells[idx].className = 'cell cell-empty';
+      }
+    }
+  }
+
+  // Stats
+  document.getElementById('score').textContent = obs.score || 0;
+  document.getElementById('lines').textContent = obs.total_lines || 0;
+  document.getElementById('height').textContent = obs.max_height || 0;
+  document.getElementById('holes').textContent = obs.holes || 0;
+  document.getElementById('steps').textContent = obs.steps || 0;
+
+  // Reward
+  if (reward !== undefined && reward !== null) {
+    const el = document.getElementById('reward');
+    el.textContent = reward >= 0 ? '+' + reward : reward;
+    el.className = 'reward-display ' + (reward >= 0 ? 'reward-pos' : 'reward-neg');
+  }
+
+  // Next piece
+  if (obs.next_piece_shape) {
+    renderNextPiece(obs.next_piece_shape);
+  }
+
+  // Game over
+  if (done) {
+    gameOver = true;
+    setStatus('gameover', 'GAME OVER — press R');
+  }
+}
+
+function renderNextPiece(shape) {
+  const el = document.getElementById('next-piece');
+  el.innerHTML = '';
+  const rows = shape.split('\n');
+  const maxCols = 4;
+  const maxRows = 4;
+  for (let r = 0; r < maxRows; r++) {
+    for (let c = 0; c < maxCols; c++) {
+      const cell = document.createElement('div');
+      const ch = (rows[r] || '')[c] || '.';
+      cell.className = 'next-cell' + (ch === '#' ? ' filled' : '');
+      el.appendChild(cell);
+    }
+  }
+}
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  if (key === 'a' || key === 'arrowleft') send('left');
+  else if (key === 'd' || key === 'arrowright') send('right');
+  else if (key === 's' || key === 'arrowdown') send('down');
+  else if (key === ' ') { e.preventDefault(); send('drop'); }
+  else if (key === 'q') send('rotate_ccw');
+  else if (key === 'e') send('rotate_cw');
+  else if (key === 'r') doReset();
+});
+
+connect();
+</script>
+</body>
+</html>
