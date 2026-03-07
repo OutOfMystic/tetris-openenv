@@ -10,6 +10,6 @@ COPY README.md README.md
 
 ENV ENABLE_WEB_INTERFACE=true
 
-EXPOSE 7860
+EXPOSE 8000
 
-CMD ["uvicorn", "src.tetris_env.server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "src.tetris_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
