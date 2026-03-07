@@ -6,6 +6,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ src/
+COPY README.md README.md
+
+ENV ENABLE_WEB_INTERFACE=true
 
 EXPOSE 7860
 
