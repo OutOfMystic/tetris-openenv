@@ -86,6 +86,7 @@ class TetrisEnv:
         self.next_piece_name = ""
         self.next_piece = None
         self.max_penalized_height = HEIGHT_BREACH_THRESHOLD
+        self.pieces_locked = 0
         self._spawn_next()
         self._spawn_next()
 
@@ -253,6 +254,7 @@ class TetrisEnv:
             else:
                 # Can't move down — lock piece
                 self._lock_piece()
+                self.pieces_locked += 1
                 lines = self._clear_lines()
                 if lines > 0:
                     reward += LINE_REWARDS.get(lines, lines * 400)
@@ -261,6 +263,7 @@ class TetrisEnv:
         else:
             # Drop action: lock immediately
             self._lock_piece()
+            self.pieces_locked += 1
             lines = self._clear_lines()
             if lines > 0:
                 reward += LINE_REWARDS.get(lines, lines * 400)
@@ -273,10 +276,13 @@ class TetrisEnv:
             reward += HOLE_PENALTY_MULT * new_holes
 
         # One-time penalty for each height level breached above threshold
+        # Decays by 5 per piece locked: piece 0 → -50, piece 9 → -5, piece 10+ → 0
         current_height = self._max_height()
         if current_height > self.max_penalized_height:
-            new_levels = current_height - self.max_penalized_height
-            reward += HEIGHT_BREACH_PENALTY * new_levels
+            penalty_per_level = min(0, HEIGHT_BREACH_PENALTY + 5 * self.pieces_locked)
+            if penalty_per_level < 0:
+                new_levels = current_height - self.max_penalized_height
+                reward += penalty_per_level * new_levels
             self.max_penalized_height = current_height
 
         if self.done:
