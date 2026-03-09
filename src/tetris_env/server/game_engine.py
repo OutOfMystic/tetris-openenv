@@ -38,7 +38,6 @@ LINE_REWARDS = {
 }
 
 STEP_PENALTY = -1
-HEIGHT_PENALTY_MULT = -2
 HOLE_PENALTY_MULT = -5
 GAME_OVER_PENALTY = -500
 
@@ -218,6 +217,8 @@ class TetrisEnv:
         self.steps += 1
         reward = STEP_PENALTY  # base penalty per step
 
+        holes_before = self._count_holes()
+
         action = action.strip().lower()
 
         if action == "left":
@@ -263,9 +264,10 @@ class TetrisEnv:
                 self.score += LINE_REWARDS.get(lines, lines * 400)
             self._spawn_next()
 
-        # Penalties for board state
-        reward += HEIGHT_PENALTY_MULT * self._max_height()
-        reward += HOLE_PENALTY_MULT * self._count_holes()
+        # Penalty only for NEW holes created by this step
+        new_holes = self._count_holes() - holes_before
+        if new_holes > 0:
+            reward += HOLE_PENALTY_MULT * new_holes
 
         if self.done:
             reward += GAME_OVER_PENALTY
