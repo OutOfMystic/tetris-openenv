@@ -2,7 +2,7 @@
 Tetris Environment for OpenEnv.
 Full game logic with combo scoring reward system.
 """
-__version__ = "0.4.0"  # decaying height breach penalty, hole penalty only new, step -0.1
+__version__ = "0.5.0"  # game_over -50, height breach OFF, LR 1e-4
 
 import random
 import copy
@@ -40,9 +40,9 @@ LINE_REWARDS = {
 
 STEP_PENALTY = -0.1
 HOLE_PENALTY_MULT = -5
-GAME_OVER_PENALTY = -500
+GAME_OVER_PENALTY = -50
 HEIGHT_BREACH_THRESHOLD = 4
-HEIGHT_BREACH_PENALTY = -50
+HEIGHT_BREACH_PENALTY = 0  # disabled for initial training
 
 
 def rotate_cw(piece: list[list[int]]) -> list[list[int]]:
