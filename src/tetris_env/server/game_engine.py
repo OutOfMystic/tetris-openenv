@@ -2,7 +2,7 @@
 Tetris Environment for OpenEnv.
 Full game logic with combo scoring reward system.
 """
-__version__ = "0.5.1"  # game_over -50, height breach ON (decaying), LR 1e-4
+__version__ = "0.6.0"  # configurable height_breach_penalty per instance
 
 import random
 import copy
@@ -68,8 +68,9 @@ def rotate_ccw(piece: list[list[int]]) -> list[list[int]]:
 
 
 class TetrisEnv:
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(self, seed: Optional[int] = None, height_breach_penalty: float = HEIGHT_BREACH_PENALTY):
         self.rng = random.Random(seed)
+        self.height_breach_penalty = height_breach_penalty
         self.reset_state()
 
     def reset_state(self, seed: Optional[int] = None):
@@ -280,7 +281,7 @@ class TetrisEnv:
         # Decays by 5 per piece locked: piece 0 → -50, piece 9 → -5, piece 10+ → 0
         current_height = self._max_height()
         if current_height > self.max_penalized_height:
-            penalty_per_level = min(0, HEIGHT_BREACH_PENALTY + 5 * self.pieces_locked)
+            penalty_per_level = min(0, self.height_breach_penalty + 5 * self.pieces_locked)
             if penalty_per_level < 0:
                 new_levels = current_height - self.max_penalized_height
                 reward += penalty_per_level * new_levels
