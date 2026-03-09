@@ -45,7 +45,9 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-width: 220px;
+    width: 260px;
+    min-width: 260px;
+    max-width: 260px;
   }
   .panel {
     background: #16213e;
@@ -144,8 +146,9 @@
     font-size: 11px;
     color: #888;
     word-break: break-all;
-    max-height: 60px;
+    max-height: 80px;
     overflow-y: auto;
+    overflow-x: hidden;
     margin-top: 4px;
   }
   kbd {
@@ -167,12 +170,12 @@
   <div class="sidebar">
     <div id="status" class="status disconnected">Connecting...</div>
 
-    <!-- Episode progress: X/60 actions -->
+    <!-- Episode progress: X/100 actions -->
     <div class="panel">
-      <h3>Episode (60 actions)</h3>
+      <h3>Episode (100 actions)</h3>
       <div class="progress-bar">
         <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-        <div class="progress-text" id="progress-text">0 / 60</div>
+        <div class="progress-text" id="progress-text">0 / 100</div>
       </div>
       <div class="action-log" id="action-log"></div>
     </div>
@@ -220,7 +223,7 @@
 </div>
 
 <script>
-const MAX_ACTIONS = 60;
+const MAX_ACTIONS = 100;
 const ACTION_CHARS = {
   'left': 'L', 'right': 'R', 'rotate_cw': 'C',
   'rotate_ccw': 'W', 'drop': 'D', 'down': 'S'
@@ -288,7 +291,7 @@ function doReset() {
   updateProgress();
   updateTrainingReward();
   document.getElementById('action-log').textContent = '';
-  setStatus('connected', 'Episode ready — make 60 moves');
+  setStatus('connected', 'Episode ready — make 100 moves');
   ws.send(JSON.stringify({type: 'reset', data: {}}));
 }
 
@@ -356,7 +359,7 @@ function handleObs(data) {
   if (done) {
     gameOver = true;
     const r = calcTrainingReward(obs, true);
-    setStatus('gameover', 'GAME OVER at ' + actionCount + '/60 — Reward: ' + r.toFixed(1) + ' — press N');
+    setStatus('gameover', 'GAME OVER at ' + actionCount + '/100 — Reward: ' + r.toFixed(1) + ' — press N');
   } else if (actionCount >= MAX_ACTIONS) {
     episodeDone = true;
     const r = calcTrainingReward(obs, false);
