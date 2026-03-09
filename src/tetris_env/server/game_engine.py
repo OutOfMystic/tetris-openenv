@@ -37,7 +37,7 @@ LINE_REWARDS = {
     4: 1500,  # "Tetris!" — the dream
 }
 
-STEP_PENALTY = -1
+STEP_PENALTY = -0.1
 HOLE_PENALTY_MULT = -5
 GAME_OVER_PENALTY = -500
 
