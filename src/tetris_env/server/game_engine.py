@@ -2,6 +2,7 @@
 Tetris Environment for OpenEnv.
 Full game logic with combo scoring reward system.
 """
+__version__ = "0.4.0"  # decaying height breach penalty, hole penalty only new, step -0.1
 
 import random
 import copy
