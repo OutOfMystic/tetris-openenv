@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tetris OpenEnv — Training Mode</title>
+<title>Tetris OpenEnv — Per-Piece Training Mode</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -44,30 +44,31 @@
   .sidebar {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    width: 260px;
-    min-width: 260px;
-    max-width: 260px;
+    gap: 10px;
+    width: 270px;
+    min-width: 270px;
+    max-width: 270px;
   }
   .panel {
     background: #16213e;
     border: 2px solid #0f3460;
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
   }
   .panel h3 {
     color: #e94560;
-    margin-bottom: 6px;
-    font-size: 13px;
+    margin-bottom: 5px;
+    font-size: 12px;
     text-transform: uppercase;
   }
   .stat-row {
     display: flex;
     justify-content: space-between;
-    margin: 3px 0;
-    font-size: 13px;
+    margin: 2px 0;
+    font-size: 12px;
   }
   .stat-value { color: #53d769; font-weight: bold; }
+  .stat-value.warn { color: #e94560; }
   .next-piece {
     display: grid;
     grid-template-columns: repeat(4, 20px);
@@ -100,7 +101,6 @@
   .controls button:hover { background: #e94560; }
   .controls button:active { background: #ff6b81; }
   .controls button.wide { grid-column: span 3; }
-  .controls button.disabled { opacity: 0.3; pointer-events: none; }
   .status {
     font-size: 12px;
     text-align: center;
@@ -109,17 +109,17 @@
   }
   .status.connected { background: #1b4332; color: #53d769; }
   .status.disconnected { background: #4a1525; color: #e94560; }
-  .status.gameover { background: #4a1525; color: #ff6b81; font-size: 14px; font-weight: bold; }
-  .status.complete { background: #1b4332; color: #53d769; font-size: 14px; font-weight: bold; }
+  .status.gameover { background: #4a1525; color: #ff6b81; font-size: 13px; font-weight: bold; }
+  .status.complete { background: #1b4332; color: #53d769; font-size: 13px; font-weight: bold; }
   .progress-bar {
     background: #0a0a1a;
     border-radius: 4px;
-    height: 20px;
+    height: 18px;
     overflow: hidden;
     position: relative;
   }
   .progress-fill {
-    background: linear-gradient(90deg, #e94560, #53d769);
+    background: linear-gradient(90deg, #53d769, #e94560);
     height: 100%;
     transition: width 0.15s;
     border-radius: 4px;
@@ -130,7 +130,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: bold;
   }
   .training-reward {
@@ -146,17 +146,26 @@
     font-size: 11px;
     color: #888;
     word-break: break-all;
-    max-height: 80px;
+    max-height: 60px;
     overflow-y: auto;
     overflow-x: hidden;
     margin-top: 4px;
   }
-  kbd {
-    background: #0a0a1a;
-    border: 1px solid #444;
+  .piece-badge {
+    display: inline-block;
+    background: #0f3460;
+    color: #53d769;
     border-radius: 3px;
-    padding: 1px 5px;
+    padding: 1px 6px;
     font-size: 11px;
+    font-weight: bold;
+  }
+  .forced-drop {
+    color: #e94560;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 3px;
   }
 </style>
 </head>
@@ -170,29 +179,46 @@
   <div class="sidebar">
     <div id="status" class="status disconnected">Connecting...</div>
 
-    <!-- Episode progress: X/100 actions -->
+    <!-- Current piece situation -->
     <div class="panel">
-      <h3>Episode (100 actions)</h3>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-        <div class="progress-text" id="progress-text">0 / 100</div>
+      <h3>Current Piece <span class="piece-badge" id="piece-name">?</span></h3>
+      <div class="stat-row">
+        <span>Actions this piece</span>
+        <span class="stat-value" id="piece-actions">0 / 20</span>
       </div>
-      <div class="action-log" id="action-log"></div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="piece-progress" style="width:0%"></div>
+        <div class="progress-text" id="piece-progress-text">0 / 20</div>
+      </div>
+      <div class="action-log" id="piece-action-log"></div>
+      <div class="forced-drop" id="forced-drop-msg"></div>
     </div>
 
-    <!-- Training reward (same formula as Cell 6) -->
+    <!-- Game progress -->
+    <div class="panel">
+      <h3>Game Progress</h3>
+      <div class="stat-row"><span>Total steps</span><span class="stat-value" id="total-steps">0 / 200</span></div>
+      <div class="stat-row"><span>Pieces placed</span><span class="stat-value" id="pieces-placed">0</span></div>
+      <div class="stat-row"><span>Lines cleared</span><span class="stat-value" id="lines">0</span></div>
+      <div class="progress-bar" style="margin-top:4px">
+        <div class="progress-fill" id="game-progress" style="width:0%"></div>
+        <div class="progress-text" id="game-progress-text">0 / 200</div>
+      </div>
+    </div>
+
+    <!-- Training reward -->
     <div class="panel">
       <h3>Training Reward</h3>
       <div class="training-reward reward-neutral" id="training-reward">-</div>
-      <div style="font-size:10px; color:#666; margin-top:4px;">
-        lines*200 + steps*0.5 - holes*2 - height*1 - gameover*50
+      <div style="font-size:9px; color:#666; margin-top:4px;">
+        engine_rewards + lines*100/line<br>
+        L/R: -0.1 | placed: +1 | no-place: -10
       </div>
     </div>
 
     <div class="panel">
       <h3>Board State</h3>
       <div class="stat-row"><span>Score</span><span class="stat-value" id="score">0</span></div>
-      <div class="stat-row"><span>Lines</span><span class="stat-value" id="lines">0</span></div>
       <div class="stat-row"><span>Height</span><span class="stat-value" id="height">0</span></div>
       <div class="stat-row"><span>Holes</span><span class="stat-value" id="holes">0</span></div>
     </div>
@@ -204,26 +230,32 @@
 
     <div class="panel">
       <h3>Controls</h3>
-      <div class="controls" id="controls">
+      <div class="controls">
         <button onclick="send('rotate_ccw')">W: CCW &#x21BA;</button>
         <button onclick="send('drop')">D: DROP</button>
         <button onclick="send('rotate_cw')">C: CW &#x21BB;</button>
         <button onclick="send('left')">L: &#x2190; Left</button>
         <button onclick="send('down')">S: &#x2193; Down</button>
         <button onclick="send('right')">R: Right &#x2192;</button>
-        <button class="wide" onclick="doReset()" style="background:#4a1525">NEW EPISODE &nbsp;<kbd>N</kbd></button>
+        <button class="wide" onclick="doReset()" style="background:#4a1525">NEW GAME &nbsp;(N)</button>
       </div>
     </div>
 
-    <div class="panel" style="font-size:10px; color:#888;">
-      <b>Keys:</b> L/R = move, S = down, D = drop, C/W = rotate, N = new episode<br>
-      <b>Training format:</b> L R C W D S (same as GRPO prompt)
+    <div class="panel" style="font-size:9px; color:#888;">
+      <b>Per-piece mode:</b> max 20 actions per piece, 200 steps total.<br>
+      If piece not placed in 20 actions: forced drop + penalty.
     </div>
   </div>
 </div>
 
 <script>
-const MAX_ACTIONS = 100;
+const MAX_ACTIONS_PER_PIECE = 20;
+const MAX_STEPS_PER_GAME = 200;
+const LR_PENALTY = -0.1;
+const PIECE_PLACED_BONUS = 1.0;
+const NO_PLACE_PENALTY = -10.0;
+const LINE_CLEAR_BONUS = 100.0;
+
 const ACTION_CHARS = {
   'left': 'L', 'right': 'R', 'rotate_cw': 'C',
   'rotate_ccw': 'W', 'drop': 'D', 'down': 'S'
@@ -240,8 +272,18 @@ const COLS = 10, ROWS = 20;
 let ws = null;
 let gameOver = false;
 let episodeDone = false;
-let actionCount = 0;
-let actionLog = [];
+
+// Per-piece tracking
+let currentPieceName = null;
+let pieceActionCount = 0;
+let pieceActionLog = [];
+
+// Game tracking
+let totalSteps = 0;
+let piecesPlaced = 0;
+let totalLines = 0;
+let trainingReward = 0;
+let engineRewardAccum = 0;  // sum of server-reported rewards
 let lastObs = null;
 
 // Build board cells
@@ -276,8 +318,16 @@ function setStatus(cls, text) {
 function send(action) {
   if (!ws || ws.readyState !== 1) return;
   if (gameOver || episodeDone) return;
-  actionCount++;
-  actionLog.push(ACTION_CHARS[action]);
+
+  pieceActionCount++;
+  totalSteps++;
+  pieceActionLog.push(ACTION_CHARS[action]);
+
+  // L/R penalty
+  if (action === 'left' || action === 'right') {
+    trainingReward += LR_PENALTY;
+  }
+
   ws.send(JSON.stringify({type: 'step', data: {action: action, metadata: {}}}));
 }
 
@@ -285,44 +335,91 @@ function doReset() {
   if (!ws || ws.readyState !== 1) return;
   gameOver = false;
   episodeDone = false;
-  actionCount = 0;
-  actionLog = [];
+  currentPieceName = null;
+  pieceActionCount = 0;
+  pieceActionLog = [];
+  totalSteps = 0;
+  piecesPlaced = 0;
+  totalLines = 0;
+  trainingReward = 0;
+  engineRewardAccum = 0;
   lastObs = null;
-  updateProgress();
-  updateTrainingReward();
-  document.getElementById('action-log').textContent = '';
-  setStatus('connected', 'Episode ready — make 100 moves');
+  updateUI();
+  document.getElementById('forced-drop-msg').textContent = '';
+  setStatus('connected', 'Game ready — place pieces!');
   ws.send(JSON.stringify({type: 'reset', data: {}}));
 }
 
-function updateProgress() {
-  const pct = Math.min(100, (actionCount / MAX_ACTIONS) * 100);
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('progress-text').textContent = actionCount + ' / ' + MAX_ACTIONS;
-  document.getElementById('action-log').textContent = actionLog.join(' ');
-}
+function updateUI() {
+  // Piece progress
+  const pct = Math.min(100, (pieceActionCount / MAX_ACTIONS_PER_PIECE) * 100);
+  document.getElementById('piece-progress').style.width = pct + '%';
+  document.getElementById('piece-progress-text').textContent = pieceActionCount + ' / ' + MAX_ACTIONS_PER_PIECE;
+  document.getElementById('piece-actions').textContent = pieceActionCount + ' / ' + MAX_ACTIONS_PER_PIECE;
+  if (pieceActionCount > 15) {
+    document.getElementById('piece-actions').className = 'stat-value warn';
+  } else {
+    document.getElementById('piece-actions').className = 'stat-value';
+  }
+  document.getElementById('piece-action-log').textContent = pieceActionLog.join(' ');
 
-function calcTrainingReward(obs, isDone) {
-  const lines = obs.total_lines || 0;
-  const steps = actionCount;
-  const holes = obs.holes || 0;
-  const height = obs.max_height || 0;
-  let r = lines * 200.0 + steps * 0.5 - holes * 2.0 - height * 1.0;
-  if (isDone) r -= 50.0;
-  return r;
-}
+  // Game progress
+  const gpct = Math.min(100, (totalSteps / MAX_STEPS_PER_GAME) * 100);
+  document.getElementById('game-progress').style.width = gpct + '%';
+  document.getElementById('game-progress-text').textContent = totalSteps + ' / ' + MAX_STEPS_PER_GAME;
+  document.getElementById('total-steps').textContent = totalSteps + ' / ' + MAX_STEPS_PER_GAME;
+  document.getElementById('pieces-placed').textContent = piecesPlaced;
+  document.getElementById('lines').textContent = totalLines;
 
-function updateTrainingReward() {
-  const el = document.getElementById('training-reward');
-  if (!lastObs) { el.textContent = '-'; el.className = 'training-reward reward-neutral'; return; }
-  const r = calcTrainingReward(lastObs, gameOver);
-  el.textContent = r >= 0 ? '+' + r.toFixed(1) : r.toFixed(1);
-  el.className = 'training-reward ' + (r >= 0 ? 'reward-pos' : 'reward-neg');
+  // Training reward
+  const rEl = document.getElementById('training-reward');
+  rEl.textContent = trainingReward >= 0 ? '+' + trainingReward.toFixed(1) : trainingReward.toFixed(1);
+  rEl.className = 'training-reward ' + (trainingReward >= 0 ? 'reward-pos' : 'reward-neg');
 }
 
 function handleObs(data) {
   const obs = data.observation || data;
   const done = data.done || obs.done;
+  const reward = data.reward || obs.reward || 0;
+
+  // Accumulate engine reward
+  engineRewardAccum += reward;
+  trainingReward = engineRewardAccum;
+  // Re-add training modifiers (already added in send() for L/R)
+  // We track LR penalty separately in send(), so just update engine part
+  // Actually, let's track everything in trainingReward directly
+  // Engine reward is added via engineRewardAccum, LR penalty via send()
+  // Need to sync: trainingReward = engineRewardAccum + (LR penalties already added)
+  // Fix: compute total as sum of parts
+  trainingReward = engineRewardAccum;
+  // LR penalties are already in trainingReward from send() — no, they're separate
+  // Let me simplify: track all reward components in trainingReward
+
+  // Detect piece change (piece was placed)
+  const newPieceName = obs.current_piece;
+  if (currentPieceName !== null && newPieceName !== currentPieceName && !done) {
+    // Piece was placed!
+    piecesPlaced++;
+    trainingReward += PIECE_PLACED_BONUS;
+
+    // Line clear bonus
+    const newLines = obs.total_lines || 0;
+    const linesCleared = newLines - totalLines;
+    if (linesCleared > 0) {
+      trainingReward += linesCleared * LINE_CLEAR_BONUS;
+    }
+    totalLines = newLines;
+
+    // Reset per-piece tracking
+    pieceActionCount = 0;
+    pieceActionLog = [];
+    document.getElementById('forced-drop-msg').textContent = '';
+  }
+  currentPieceName = newPieceName;
+  document.getElementById('piece-name').textContent = newPieceName || '?';
+
+  // Update lines
+  totalLines = obs.total_lines || 0;
   lastObs = obs;
 
   // Parse board
@@ -344,26 +441,33 @@ function handleObs(data) {
 
   // Stats
   document.getElementById('score').textContent = obs.score || 0;
-  document.getElementById('lines').textContent = obs.total_lines || 0;
   document.getElementById('height').textContent = obs.max_height || 0;
   document.getElementById('holes').textContent = obs.holes || 0;
 
   // Next piece
   if (obs.next_piece_shape) renderNextPiece(obs.next_piece_shape);
 
-  // Update progress & reward
-  updateProgress();
-  updateTrainingReward();
+  updateUI();
 
-  // Check episode end
+  // Check: piece not placed in 20 actions -> force drop
+  if (!done && !gameOver && pieceActionCount >= MAX_ACTIONS_PER_PIECE) {
+    trainingReward += NO_PLACE_PENALTY;
+    document.getElementById('forced-drop-msg').textContent = 'FORCED DROP (-10 penalty)';
+    // Auto-send drop
+    pieceActionCount = 0;
+    pieceActionLog = [];
+    totalSteps++;
+    ws.send(JSON.stringify({type: 'step', data: {action: 'drop', metadata: {}}}));
+    return;
+  }
+
+  // Check game end
   if (done) {
     gameOver = true;
-    const r = calcTrainingReward(obs, true);
-    setStatus('gameover', 'GAME OVER at ' + actionCount + '/100 — Reward: ' + r.toFixed(1) + ' — press N');
-  } else if (actionCount >= MAX_ACTIONS) {
+    setStatus('gameover', 'GAME OVER — Steps: ' + totalSteps + ' Reward: ' + trainingReward.toFixed(1) + ' (N)');
+  } else if (totalSteps >= MAX_STEPS_PER_GAME) {
     episodeDone = true;
-    const r = calcTrainingReward(obs, false);
-    setStatus('complete', 'EPISODE COMPLETE — Reward: ' + r.toFixed(1) + ' — press N');
+    setStatus('complete', 'MAX STEPS — Pieces: ' + piecesPlaced + ' Reward: ' + trainingReward.toFixed(1) + ' (N)');
   }
 }
 
