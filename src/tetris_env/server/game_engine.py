@@ -40,6 +40,8 @@ LINE_REWARDS = {
 STEP_PENALTY = -0.1
 HOLE_PENALTY_MULT = -5
 GAME_OVER_PENALTY = -500
+HEIGHT_BREACH_THRESHOLD = 4
+HEIGHT_BREACH_PENALTY = -50
 
 
 def rotate_cw(piece: list[list[int]]) -> list[list[int]]:
@@ -83,6 +85,7 @@ class TetrisEnv:
         self.current_y = 0
         self.next_piece_name = ""
         self.next_piece = None
+        self.max_penalized_height = HEIGHT_BREACH_THRESHOLD
         self._spawn_next()
         self._spawn_next()
 
@@ -268,6 +271,13 @@ class TetrisEnv:
         new_holes = self._count_holes() - holes_before
         if new_holes > 0:
             reward += HOLE_PENALTY_MULT * new_holes
+
+        # One-time penalty for each height level breached above threshold
+        current_height = self._max_height()
+        if current_height > self.max_penalized_height:
+            new_levels = current_height - self.max_penalized_height
+            reward += HEIGHT_BREACH_PENALTY * new_levels
+            self.max_penalized_height = current_height
 
         if self.done:
             reward += GAME_OVER_PENALTY
